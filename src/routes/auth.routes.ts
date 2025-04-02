@@ -156,29 +156,173 @@ router.get('/me', async (req, res) => {
 // Email confirmation route
 router.get('/confirm', async (req, res) => {
   try {
-    const { access_token, refresh_token } = req.query;
+    logger.info('Email confirmation page requested');
+    
+    // Send HTML directly
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Email Confirmed - Success!</title>
+          <style>
+              * {
+                  margin: 0;
+                  padding: 0;
+                  box-sizing: border-box;
+                  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              }
 
-    if (!access_token || !refresh_token) {
-      logger.error('Missing tokens in confirmation request');
-      return res.status(400).sendFile(path.join(__dirname, '../views/error.html'));
-    }
+              body {
+                  min-height: 100vh;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                  padding: 20px;
+              }
 
-    // Set the session with the tokens
-    const { data, error } = await supabase.auth.setSession({
-      access_token: access_token as string,
-      refresh_token: refresh_token as string,
-    });
+              .container {
+                  background: white;
+                  padding: 40px;
+                  border-radius: 20px;
+                  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+                  text-align: center;
+                  max-width: 500px;
+                  width: 100%;
+              }
 
-    if (error) {
-      logger.error('Session error:', error);
-      return res.status(400).sendFile(path.join(__dirname, '../views/error.html'));
-    }
+              .success-icon {
+                  width: 80px;
+                  height: 80px;
+                  background: #4CAF50;
+                  border-radius: 50%;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  margin: 0 auto 30px;
+                  position: relative;
+              }
 
-    logger.info('Email confirmed and session established successfully');
-    res.sendFile(path.join(__dirname, '../views/success.html'));
+              .success-icon::before {
+                  content: '✓';
+                  color: white;
+                  font-size: 40px;
+                  font-weight: bold;
+              }
+
+              h1 {
+                  color: #333;
+                  margin-bottom: 20px;
+                  font-size: 28px;
+              }
+
+              p {
+                  color: #666;
+                  margin-bottom: 30px;
+                  line-height: 1.6;
+              }
+
+              .button {
+                  display: inline-block;
+                  padding: 12px 30px;
+                  background: #4CAF50;
+                  color: white;
+                  text-decoration: none;
+                  border-radius: 25px;
+                  font-weight: 500;
+                  transition: transform 0.2s, box-shadow 0.2s;
+              }
+
+              .button:hover {
+                  transform: translateY(-2px);
+                  box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+              }
+          </style>
+      </head>
+      <body>
+          <div class="container">
+              <div class="success-icon"></div>
+              <h1>Email Confirmed!</h1>
+              <p>Your email has been successfully verified. You can now close this window and return to the application.</p>
+          </div>
+      </body>
+      </html>
+    `);
   } catch (error) {
     logger.error('Email confirmation error:', error);
-    res.status(500).sendFile(path.join(__dirname, '../views/error.html'));
+    res.status(500).send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Verification Error</title>
+          <style>
+              * {
+                  margin: 0;
+                  padding: 0;
+                  box-sizing: border-box;
+                  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              }
+
+              body {
+                  min-height: 100vh;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  background: linear-gradient(135deg, #ff6b6b 0%, #ee5253 100%);
+                  padding: 20px;
+              }
+
+              .container {
+                  background: white;
+                  padding: 40px;
+                  border-radius: 20px;
+                  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+                  text-align: center;
+                  max-width: 500px;
+                  width: 100%;
+              }
+
+              h1 {
+                  color: #333;
+                  margin-bottom: 20px;
+                  font-size: 28px;
+              }
+
+              p {
+                  color: #666;
+                  margin-bottom: 30px;
+                  line-height: 1.6;
+              }
+
+              .button {
+                  display: inline-block;
+                  padding: 12px 30px;
+                  background: #ee5253;
+                  color: white;
+                  text-decoration: none;
+                  border-radius: 25px;
+                  font-weight: 500;
+                  transition: transform 0.2s, box-shadow 0.2s;
+              }
+
+              .button:hover {
+                  transform: translateY(-2px);
+                  box-shadow: 0 5px 15px rgba(238, 82, 83, 0.3);
+              }
+          </style>
+      </head>
+      <body>
+          <div class="container">
+              <h1>Verification Error</h1>
+              <p>Something went wrong while confirming your email. Please try again or contact support if the problem persists.</p>
+          </div>
+      </body>
+      </html>
+    `);
   }
 });
 
