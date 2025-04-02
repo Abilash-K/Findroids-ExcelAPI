@@ -15,6 +15,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Create Supabase client
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce'
+  }
+});
 
 export default supabase; 
