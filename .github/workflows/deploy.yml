@@ -28,11 +28,11 @@ jobs:
       - name: Build TypeScript
         run: npm run build
 
-      - name: Google Auth
-        id: auth
+      - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v1
         with:
-          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+          workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
+          service_account: '${{ secrets.WIF_SERVICE_ACCOUNT }}'
 
       - name: Setup Google Cloud CLI
         uses: google-github-actions/setup-gcloud@v1
