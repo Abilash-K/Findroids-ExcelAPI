@@ -5,6 +5,7 @@ import { requestLogger } from './middleware/logger.middleware';
 import { errorHandler } from './middleware/error.middleware';
 import helloRoutes from './routes/hello.routes';
 import authRoutes from './routes/auth.routes';
+import vendorRoutes from './routes/vendor.routes';
 import config from './config';
 import './config/supabase'; // This will initialize Supabase and validate its config
 
@@ -20,6 +21,7 @@ app.use(requestLogger);
 // Routes
 app.use('/', helloRoutes);
 app.use('/auth', authRoutes);
+app.use('/api', vendorRoutes);
 
 // Error handling
 app.use(errorHandler);

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { RegisterRequest, LoginRequest, AuthResponse } from '../types/auth.types';
+import { RegisterRequest, LoginRequest, AuthResponse, UserProfile } from '../types/auth.types';
 import supabase from '../config/supabase';
 import logger from '../utils/logger';
 import path from 'path';
@@ -20,7 +20,7 @@ router.post('/register', async (req, res) => {
     }
 
     // Register user with Supabase
-    const { data, error } = await supabase.auth.signUp({
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -31,19 +31,43 @@ router.post('/register', async (req, res) => {
       }
     });
 
-    if (error) {
-      logger.error('Registration error:', error);
+    if (authError) {
+      logger.error('Registration error:', authError);
       return res.status(400).json({
         success: false,
-        message: error.message
+        message: authError.message
       } as AuthResponse);
+    }
+
+    if (!authData.user) {
+      throw new Error('No user data returned from signup');
+    }
+
+    // Create user profile in users table
+    const { error: profileError } = await supabase
+      .from('users')
+      .insert([
+        {
+          id: authData.user.id,
+          email: email,
+          first_name: firstName || '',
+          last_name: lastName || '',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      ]);
+
+    if (profileError) {
+      logger.error('Error creating user profile:', profileError);
+      // Don't throw error here, as the auth user is already created
+      // Just log the error and continue
     }
 
     logger.info('User registered successfully:', email);
     res.status(201).json({
       success: true,
       message: 'Registration successful',
-      data: { user: data.user }
+      data: { user: authData.user }
     } as AuthResponse);
   } catch (error) {
     logger.error('Registration error:', error);
