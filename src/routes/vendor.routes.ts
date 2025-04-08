@@ -341,7 +341,7 @@ router.post('/payments/:id/confirm', async (req, res) => {
     });
 
     // Use stored procedure to update both payment and account
-    const { data: success, error: transactionError } = await supabase.rpc('confirm_payment', {
+    const { data: result, error: transactionError } = await supabase.rpc('confirm_payment', {
       p_payment_id: id,
       p_amount: payment.amount,
       p_account_id: payment.account_id
@@ -352,45 +352,26 @@ router.post('/payments/:id/confirm', async (req, res) => {
       throw transactionError;
     }
 
-    if (!success) {
+    if (!result.success) {
       return res.status(400).json({
         success: false,
-        message: 'Could not confirm payment - insufficient balance or other error',
-        data: {
+        message: result.message,
+        data: result.data || {
           current_balance: payment.accounts.balance,
           payment_amount: payment.amount
         }
       } as PaymentResponse);
     }
 
-    // Get the updated payment and account information
-    const { data: updatedPayment, error: updateError } = await supabase
-      .from('payments')
-      .select(`
-        *,
-        accounts (balance)
-      `)
-      .eq('id', id)
-      .single();
-
-    if (updateError) throw updateError;
-
     // Log the result
-    logger.info('Payment confirmed:', {
-      payment_id: id,
-      new_balance: updatedPayment.accounts.balance,
-      old_balance: payment.accounts.balance,
-      amount: payment.amount
-    });
+    logger.info('Payment confirmed:', result);
 
     res.json({
       success: true,
       message: 'Payment confirmed successfully',
       data: { 
-        payment: updatedPayment,
-        previous_balance: payment.accounts.balance,
-        new_balance: updatedPayment.accounts.balance,
-        amount_deducted: payment.amount
+        payment,
+        ...result.data
       }
     } as PaymentResponse);
   } catch (error) {
