@@ -307,7 +307,7 @@ router.post('/payments/:id/confirm', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Start a transaction
+    // Get payment details
     const { data: payment, error: paymentError } = await supabase
       .from('payments')
       .select('*')
@@ -324,24 +324,8 @@ router.post('/payments/:id/confirm', async (req, res) => {
       } as PaymentResponse);
     }
 
-    // Check if account has sufficient balance
-    const { data: account, error: accountError } = await supabase
-      .from('accounts')
-      .select('balance')
-      .eq('id', payment.account_id)
-      .single();
-
-    if (accountError) throw accountError;
-
-    if (account.balance < payment.amount) {
-      return res.status(400).json({
-        success: false,
-        message: 'Insufficient account balance'
-      } as PaymentResponse);
-    }
-
     // Use a transaction to update both payment and account
-    const { data: result, error: transactionError } = await supabase.rpc('confirm_payment', {
+    const { data: success, error: transactionError } = await supabase.rpc('confirm_payment', {
       p_payment_id: id,
       p_amount: payment.amount,
       p_account_id: payment.account_id
@@ -349,10 +333,20 @@ router.post('/payments/:id/confirm', async (req, res) => {
 
     if (transactionError) throw transactionError;
 
+    if (!success) {
+      return res.status(400).json({
+        success: false,
+        message: 'Could not confirm payment - insufficient balance or other error'
+      } as PaymentResponse);
+    }
+
     // Get the updated payment
     const { data: updatedPayment, error: updateError } = await supabase
       .from('payments')
-      .select('*')
+      .select(`
+        *,
+        accounts (balance)
+      `)
       .eq('id', id)
       .single();
 
@@ -361,7 +355,10 @@ router.post('/payments/:id/confirm', async (req, res) => {
     res.json({
       success: true,
       message: 'Payment confirmed successfully',
-      data: { payment: updatedPayment }
+      data: { 
+        payment: updatedPayment,
+        new_balance: updatedPayment.accounts.balance
+      }
     } as PaymentResponse);
   } catch (error) {
     logger.error('Error confirming payment:', error);
