@@ -191,22 +191,20 @@ router.post('/payments', async (req, res) => {
       } as PaymentResponse);
     }
 
-    // Create payment and update account balance
+    // Create payment with pending status
+    const paymentWithStatus = {
+      ...paymentData,
+      status: 'pending'  // Explicitly set status to pending
+    };
+
+    // Create payment without updating balance
     const { data, error } = await supabase
       .from('payments')
-      .insert([paymentData])
+      .insert([paymentWithStatus])
       .select()
       .single();
 
     if (error) throw error;
-
-    // Update account balance
-    const { error: updateError } = await supabase
-      .from('accounts')
-      .update({ balance: account.balance - paymentData.amount })
-      .eq('id', paymentData.account_id);
-
-    if (updateError) throw updateError;
 
     res.status(201).json({
       success: true,
