@@ -307,7 +307,7 @@ router.post('/payments/:id/confirm', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Get payment details
+    // Start a transaction
     const { data: payment, error: paymentError } = await supabase
       .from('payments')
       .select('*')
@@ -340,23 +340,23 @@ router.post('/payments/:id/confirm', async (req, res) => {
       } as PaymentResponse);
     }
 
-    // Update payment status and account balance in a transaction
+    // Use a transaction to update both payment and account
+    const { data: result, error: transactionError } = await supabase.rpc('confirm_payment', {
+      p_payment_id: id,
+      p_amount: payment.amount,
+      p_account_id: payment.account_id
+    });
+
+    if (transactionError) throw transactionError;
+
+    // Get the updated payment
     const { data: updatedPayment, error: updateError } = await supabase
       .from('payments')
-      .update({ status: 'completed' })
+      .select('*')
       .eq('id', id)
-      .select()
       .single();
 
     if (updateError) throw updateError;
-
-    // Update account balance
-    const { error: balanceError } = await supabase
-      .from('accounts')
-      .update({ balance: account.balance - payment.amount })
-      .eq('id', payment.account_id);
-
-    if (balanceError) throw balanceError;
 
     res.json({
       success: true,
