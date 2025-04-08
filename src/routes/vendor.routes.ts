@@ -310,7 +310,10 @@ router.post('/payments/:id/confirm', async (req, res) => {
       .from('payments')
       .select(`
         *,
-        accounts (balance)
+        accounts (
+          id,
+          balance
+        )
       `)
       .eq('id', id)
       .single();
@@ -356,29 +359,49 @@ router.post('/payments/:id/confirm', async (req, res) => {
       return res.status(400).json({
         success: false,
         message: result.message,
-        data: result.data || {
+        data: {
           current_balance: payment.accounts.balance,
           payment_amount: payment.amount
         }
       } as PaymentResponse);
     }
 
+    // Get the updated payment and account data
+    const { data: updatedPayment, error: updateError } = await supabase
+      .from('payments')
+      .select(`
+        *,
+        accounts (
+          id,
+          balance
+        )
+      `)
+      .eq('id', id)
+      .single();
+
+    if (updateError) throw updateError;
+
     // Log the result
-    logger.info('Payment confirmed:', result);
+    logger.info('Payment confirmed:', {
+      ...result.data,
+      updated_payment: updatedPayment
+    });
 
     res.json({
       success: true,
       message: 'Payment confirmed successfully',
-      data: { 
-        payment,
-        ...result.data
+      data: {
+        payment: updatedPayment,
+        previous_balance: result.data.previous_balance,
+        new_balance: result.data.new_balance,
+        amount_deducted: payment.amount
       }
     } as PaymentResponse);
   } catch (error) {
     logger.error('Error confirming payment:', error);
     res.status(500).json({
       success: false,
-      message: 'Error confirming payment',
+      message: error instanceof Error ? error.message : 'Error confirming payment',
       error: error instanceof Error ? error.message : 'Unknown error'
     } as PaymentResponse);
   }
