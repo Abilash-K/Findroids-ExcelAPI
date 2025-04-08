@@ -302,6 +302,76 @@ router.delete('/payments/:id', async (req, res) => {
   }
 });
 
+// Confirm a payment
+router.post('/payments/:id/confirm', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get payment details
+    const { data: payment, error: paymentError } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (paymentError) throw paymentError;
+
+    // Check if payment is already completed
+    if (payment.status === 'completed') {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment is already completed'
+      } as PaymentResponse);
+    }
+
+    // Check if account has sufficient balance
+    const { data: account, error: accountError } = await supabase
+      .from('accounts')
+      .select('balance')
+      .eq('id', payment.account_id)
+      .single();
+
+    if (accountError) throw accountError;
+
+    if (account.balance < payment.amount) {
+      return res.status(400).json({
+        success: false,
+        message: 'Insufficient account balance'
+      } as PaymentResponse);
+    }
+
+    // Update payment status and account balance in a transaction
+    const { data: updatedPayment, error: updateError } = await supabase
+      .from('payments')
+      .update({ status: 'completed' })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    // Update account balance
+    const { error: balanceError } = await supabase
+      .from('accounts')
+      .update({ balance: account.balance - payment.amount })
+      .eq('id', payment.account_id);
+
+    if (balanceError) throw balanceError;
+
+    res.json({
+      success: true,
+      message: 'Payment confirmed successfully',
+      data: { payment: updatedPayment }
+    } as PaymentResponse);
+  } catch (error) {
+    logger.error('Error confirming payment:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error confirming payment'
+    } as PaymentResponse);
+  }
+});
+
 // Generate account status report
 router.get('/report', async (req, res) => {
   try {
