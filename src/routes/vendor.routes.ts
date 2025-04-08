@@ -305,14 +305,24 @@ router.post('/payments/:id/confirm', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Get payment details
+    // Get payment details first
     const { data: payment, error: paymentError } = await supabase
       .from('payments')
-      .select('*')
+      .select(`
+        *,
+        accounts (balance)
+      `)
       .eq('id', id)
       .single();
 
     if (paymentError) throw paymentError;
+
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Payment not found'
+      } as PaymentResponse);
+    }
 
     // Check if payment is already completed
     if (payment.status === 'completed') {
@@ -322,23 +332,38 @@ router.post('/payments/:id/confirm', async (req, res) => {
       } as PaymentResponse);
     }
 
-    // Use a transaction to update both payment and account
+    // Log the current state
+    logger.info('Confirming payment:', {
+      payment_id: id,
+      amount: payment.amount,
+      current_balance: payment.accounts.balance,
+      status: payment.status
+    });
+
+    // Use stored procedure to update both payment and account
     const { data: success, error: transactionError } = await supabase.rpc('confirm_payment', {
       p_payment_id: id,
       p_amount: payment.amount,
       p_account_id: payment.account_id
     });
 
-    if (transactionError) throw transactionError;
+    if (transactionError) {
+      logger.error('Transaction error:', transactionError);
+      throw transactionError;
+    }
 
     if (!success) {
       return res.status(400).json({
         success: false,
-        message: 'Could not confirm payment - insufficient balance or other error'
+        message: 'Could not confirm payment - insufficient balance or other error',
+        data: {
+          current_balance: payment.accounts.balance,
+          payment_amount: payment.amount
+        }
       } as PaymentResponse);
     }
 
-    // Get the updated payment
+    // Get the updated payment and account information
     const { data: updatedPayment, error: updateError } = await supabase
       .from('payments')
       .select(`
@@ -350,19 +375,30 @@ router.post('/payments/:id/confirm', async (req, res) => {
 
     if (updateError) throw updateError;
 
+    // Log the result
+    logger.info('Payment confirmed:', {
+      payment_id: id,
+      new_balance: updatedPayment.accounts.balance,
+      old_balance: payment.accounts.balance,
+      amount: payment.amount
+    });
+
     res.json({
       success: true,
       message: 'Payment confirmed successfully',
       data: { 
         payment: updatedPayment,
-        new_balance: updatedPayment.accounts.balance
+        previous_balance: payment.accounts.balance,
+        new_balance: updatedPayment.accounts.balance,
+        amount_deducted: payment.amount
       }
     } as PaymentResponse);
   } catch (error) {
     logger.error('Error confirming payment:', error);
     res.status(500).json({
       success: false,
-      message: 'Error confirming payment'
+      message: 'Error confirming payment',
+      error: error instanceof Error ? error.message : 'Unknown error'
     } as PaymentResponse);
   }
 });
