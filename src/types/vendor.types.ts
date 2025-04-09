@@ -49,9 +49,20 @@ export interface AccountResponse {
 export interface PaymentResponse {
   success: boolean;
   message: string;
+  error?: string;
   data?: {
-    payment?: Payment;
+    payment?: Payment & {
+      accounts?: {
+        id: string;
+        balance: number;
+      };
+    };
     payments?: Payment[];
+    previous_balance?: number;
+    new_balance?: number;
+    amount_deducted?: number;
+    current_balance?: number;
+    payment_amount?: number;
   };
 }
 
